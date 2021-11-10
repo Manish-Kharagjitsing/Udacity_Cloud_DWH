@@ -2,6 +2,14 @@ import configparser
 import psycopg2
 from sql_queries import copy_table_queries, insert_table_queries
 
+########################################################
+# FILE NAME:    etl.py
+# PROJECT NAME: Udacity Cloud Datawarehouse
+# Version:      1.0
+#########################################################
+
+
+
 
 def load_staging_tables(cur, conn):
     for query in copy_table_queries:
