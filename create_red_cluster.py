@@ -1,4 +1,24 @@
 import boto3
+import configparser
+
+def get_variables():
+    config = configparser.ConfigParser()
+    config.read_file(open('dwh.cfg'))
+
+    KEY= config.get('AWS','KEY')
+    SECRET= config.get('AWS','SECRET')
+    DWH_CLUSTER_TYPE= config.get("DWH","DWH_CLUSTER_TYPE")
+    DWH_NUM_NODES= config.get("DWH","DWH_NUM_NODES")
+    DWH_NODE_TYPE= config.get("DWH","DWH_NODE_TYPE")
+
+    DWH_CLUSTER_IDENTIFIER = config.get("DWH","DWH_CLUSTER_IDENTIFIER")
+    DWH_DB = config.get("DB","DB_NAME")
+    DWH_DB_USER = config.get("DB","DB_USER")
+    DWH_DB_PASSWORD = config.get("DB","DB_PASSWORD")
+    DWH_PORT = config.get("DB","DB_PORT")
+    DWH_IAM_ROLE_NAME = config.get("IAM_ROLE", "ARN")
+    pass
+
 
 def clients():
     ec2 = boto3.resource('ec2',
