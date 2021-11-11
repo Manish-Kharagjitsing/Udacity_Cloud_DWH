@@ -1,6 +1,13 @@
 import boto3
 import configparser
+import json
 
+
+#######################################################################################
+# GET ALL REQUIRED  VARIABLES. 
+# THE VARIABLES CONSISTS OF 
+# 
+#######################################################################################
 
 config = configparser.ConfigParser()
 config.read_file(open('dwh.cfg'))
@@ -16,9 +23,12 @@ DWH_DB = config.get("DB","DB_NAME")
 DWH_DB_USER = config.get("DB","DB_USER")
 DWH_DB_PASSWORD = config.get("DB","DB_PASSWORD")
 DWH_PORT = config.get("DB","DB_PORT")
-DWH_IAM_ROLE_NAME = config.get("IAM_ROLE", "ARN")
+DWH_IAM_ROLE_NAME = config.get("DWH", "DWH_IAM_ROLE_NAME")
 
-
+#######################################################################################
+# CREATE THE CLIENTS SO THAT WE AUTOMATE OUR INFRASTRUCTURE
+# 
+#######################################################################################
 
 def clients():
     ec2 = boto3.resource('ec2',
@@ -45,9 +55,47 @@ def clients():
                        aws_secret_access_key=SECRET
                   )
 
-    
+    return redshift,iam
 
-def create_red_clust():
+
+#######################################################################################
+# CREATE THE IAM ROLE THAT ALLOWS REDSHIFT TO CALL AWS SERVICES 
+# 
+#######################################################################################
+
+def create_iam_role_arn(iam):
+    try:
+        print("1.1 Creating a new IAM Role") 
+        dwhRole = iam.create_role(
+            Path='/',
+            RoleName=DWH_IAM_ROLE_NAME,
+            Description = "Allows Redshift clusters to call AWS services on your behalf.",
+            AssumeRolePolicyDocument=json.dumps(
+                {'Statement': [{'Action': 'sts:AssumeRole',
+                'Effect': 'Allow',
+                'Principal': {'Service': 'redshift.amazonaws.com'}}],
+                'Version': '2012-10-17'})
+        )
+    except Exception as e:
+        print(e)
+
+    print("1.2 Attaching Policy")
+
+    iam.attach_role_policy(RoleName=DWH_IAM_ROLE_NAME,PolicyArn="arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess")['ResponseMetadata']['HTTPStatusCode']
+    
+    print("1.3 Get the IAM role ARN")
+    roleArn = iam.get_role(RoleName=DWH_IAM_ROLE_NAME)['Role']['Arn']
+
+    return roleArn
+
+#######################################################################################
+# CREATE THE REDSHIFT CLUSTER 
+# 
+#######################################################################################
+
+
+
+def create_red_clust(redshift, iam_role):
     try:
         response = redshift.create_cluster(
             ClusterType=DWH_CLUSTER_TYPE,
@@ -59,17 +107,24 @@ def create_red_clust():
             MasterUsername=DWH_DB_USER,
             MasterUserPassword=DWH_DB_PASSWORD,
             #Roles (for s3 access)
-            IamRoles=[roleArn]  
+            IamRoles=[iam_role]  
         )
+        print("Creating cluster")
     except Exception as e:
         print(e)
 
     pass
 
 
+#######################################################################################
+# CALL THE MAIN PROGRAM. 
+# 
+#######################################################################################
+
 def main():
-    clients()
-    create_red_clust()
+    redshift_client,iam = clients()
+    iam_role = create_iam_role_arn(iam)
+    create_red_clust(redshift_client, iam_role)
     pass
 
 
