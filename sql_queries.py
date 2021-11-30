@@ -18,7 +18,7 @@ time_table_drop = "DROP TABLE IF EXISTS D_time;"
 # CREATE TABLES
 
 staging_events_table_create= ("""
-CREATE TABLE IF NOT EXISTS staging_events (
+CREATE TABLE IF NOT EXISTS S_events (
     artist VARCHAR, 
     auth VARCHAR,
     firstName VARCHAR, 
