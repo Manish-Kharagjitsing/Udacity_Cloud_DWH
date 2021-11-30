@@ -1,6 +1,15 @@
 import configparser
 
 
+"""
+THIS FILE LISTS ALL THE QUERIES THAT WILL BE EXECUTED IN THE REDSHIFT CLUSTER. 
+IT IS MEANT AS A REFERENCE FILE FOR THE FILES "etl.py" and "create_tables.py"
+"""
+
+#######################################################################
+# GET AWS CREDENTIALS FROM CONFIG FILE
+#######################################################################
+
 # CONFIG
 config = configparser.ConfigParser()
 config.read('dwh.cfg')
@@ -17,15 +26,19 @@ time_table_drop = "DROP TABLE IF EXISTS D_time;"
 
 # CREATE TABLES
 
+#######################################################################
+# CREATE STAGING TABLES
+#######################################################################
+
 staging_events_table_create= ("""
 CREATE TABLE IF NOT EXISTS S_events (
     artist VARCHAR, 
     auth VARCHAR,
     firstName VARCHAR, 
-    gender VARCHAR,
+    gender CHAR(1),
     itemInSession INT,
     lastName VARCHAR, 
-    length VARCHAR, 
+    length FLOAT, 
     level VARCHAR, 
     location VARCHAR,
     method VARCHAR, 
@@ -41,32 +54,74 @@ CREATE TABLE IF NOT EXISTS S_events (
 
 """)
 
-staging_songs_table_create = ("""
-""")
 
-songplay_table_create = ("""
-CREATE TABLE IF NOT EXISTS F_songplay (songplay_id INTEGER IDENTIRY(0,1) PRIMARY KEY sortkey,
-                                       user_id int, 
-                                       level varchar,
-                                       song_id varchar, 
-                                       artist_id varchar, 
-                                       session_id varchar,
-                                       location varchar, 
-                                       useragent varchar,
-                                       
-                        CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES D_user(user_id),\
-                        CONSTRAINT fk_song FOREIGN KEY (song_id) REFERENCES D_song(song_id),\
-                        CONSTRAINT fk_artist FOREIGN KEY (artist_id) REFERENCES D_artist(artist_id));""")
 
-user_table_create = "CREATE TABLE IF NOT EXISTS D_user(user_id int PRIMARY KEY, first_name varchar, last_name varchar,gender varchar, level varchar); "
+staging_songs_table_create = ("""CREATE TABLE IF NOT EXISTS staging_songs (
+    artist_id VARCHAR,
+    artist_latitude FLOAT,
+    artist_location TEXT,
+    artist_longitude FLOAT,
+    artist_name VARCHAR,
+    duration FLOAT,
+    num_songs INT,
+    song_id VARCHAR,
+    title VARCHAR,
+    year INT) ; 
+    """)
 
-song_table_create = "CREATE TABLE IF NOT EXISTS D_song(song_id varchar PRIMARY KEY, title varchar, artist_id varchar, year int, duration numeric) ;  "
+#######################################################################
+# CREATE FACT AND DIMENSION TABLES
+#######################################################################
 
-artist_table_create = "CREATE TABLE IF NOT EXISTS D_artist(artist_id varchar PRIMARY KEY, name varchar, location varchar, latitude varchar, longitude varchar) ; "
+songplay_table_create = ("""CREATE TABLE IF NOT EXISTS F_songplay (
+    songplay_id INTEGER IDENTIRY(0,1) PRIMARY KEY sortkey,
+    user_id int, 
+    level varchar,
+    song_id varchar, 
+    artist_id varchar, 
+    session_id varchar,
+    location varchar, 
+    useragent varchar) ; 
+    """)
 
-time_table_create = "CREATE TABLE IF NOT EXISTS D_time(time_key serial PRIMARY KEY, start_time time, hour int, day int, week int, month int, year int, weekday int)   ;"
+user_table_create = ("""CREATE TABLE IF NOT EXISTS D_user (
+    user_id int PRIMARY KEY, 
+    first_name varchar, 
+    last_name varchar,
+    gender varchar, 
+    level varchar); 
+    """)
 
-# STAGING TABLES
+song_table_create = ("""CREATE TABLE IF NOT EXISTS D_song (
+    song_id varchar PRIMARY KEY, 
+    title varchar,
+    artist_id varchar, 
+    year int, 
+    duration numeric); 
+    """)
+
+artist_table_create = ("""CREATE TABLE IF NOT EXISTS D_artist (
+    artist_id varchar PRIMARY KEY,
+    name varchar, 
+    location varchar, 
+    latitude varchar,
+    longitude varchar) ; 
+    """)
+
+time_table_create = ("""CREATE TABLE IF NOT EXISTS D_time (
+    time_key serial PRIMARY KEY, 
+    start_time time,
+    hour int,
+    day int, 
+    week int,
+    month int, 
+    year int,
+    weekday int); 
+    """)
+
+#######################################################################
+# COPY EVENTS LOG DATA INTO STAGING_EVENTS TABLE FROM AWS S3 BUCKET
+#######################################################################
 
 staging_events_copy = ("""COPY staging_events 
                        FROM {} 
@@ -77,23 +132,40 @@ staging_events_copy = ("""COPY staging_events
 staging_songs_copy = (""" COPY staging_songs 
                       FROM {}
                       iam_role {}
-                      json 
-                      
-                      """).format()
+                      json                    
+                      """).format(config.get('S3','SONG_DATA'),config.get('IAM_ROLE','ARN'))
 
 
 
-# FINAL TABLES
+#######################################################################
+# INSERT INTO FACT AND DIMENSION TABLES
+#######################################################################
 
-songplay_table_insert = """INSERT INTO F_songplay (start_time, user_id, level, song_id, artist_id, session_id, location, useragent) VALUES (%s,%s,%s,%s,%s,%s,%s,%s);"""
-                                                                    
-                                                                     
+songplay_table_insert = ("""INSERT INTO F_songplay (
+    start_time,
+    user_id, 
+    level, 
+    song_id,
+    artist_id,
+    session_id, 
+    location, 
+    useragent)
+    VALUES (%s,%s,%s,%s,%s,%s,%s,%s);
+    """)
+                                                                                                                                  
+user_table_insert = ("""INSERT INTO D_user (
+    user_id, 
+    first_name, 
+    last_name, 
+    gender, 
+    level) VALUES (%s,%s,%s,%s,%s) ON CONFLICT (user_id) DO UPDATE SET level=EXCLUDED.level;
+    """)
 
-user_table_insert = "INSERT INTO D_user (user_id, first_name, last_name, gender, level) VALUES (%s,%s,%s,%s,%s) ON CONFLICT (user_id) DO UPDATE SET level=EXCLUDED.level;"
+song_table_insert = ("""INSERT INTO D_song (song_id, title, artist_id, year, duration) VALUES (%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING;
+""")
 
-song_table_insert = "INSERT INTO D_song (song_id, title, artist_id, year, duration) VALUES (%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING;" 
-
-artist_table_insert = "INSERT INTO D_artist (artist_id, name, location, latitude, longitude) VALUES (%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING;"
+artist_table_insert = ("""INSERT INTO D_artist (artist_id, name, location, latitude, longitude) VALUES (%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING;
+""")
 
 
 time_table_insert = "INSERT INTO D_time (start_time, hour, day, week, month, year, weekday) VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING;"
