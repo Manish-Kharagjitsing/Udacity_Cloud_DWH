@@ -19,6 +19,9 @@ def main():
     config = configparser.ConfigParser()
     config.read('dwh.cfg')
 
+    # conn = psycopg2.connect("host={} dbname={} user={} password={} port={}".format(*config['CLUSTER'].values()))
+    # h = 'dwhcluster.cjzrweog6jn7.us-west-2.redshift.amazonaws.com'
+    h='jdbc:redshift://dwhcluster.cjzrweog6jn7.us-west-2.redshift.amazonaws.com'
     conn = psycopg2.connect("host={} dbname={} user={} password={} port={}".format(*config['CLUSTER'].values()))
     cur = conn.cursor()
 

@@ -14,10 +14,15 @@ IT IS MEANT AS A REFERENCE FILE FOR THE FILES "etl.py" and "create_tables.py"
 config = configparser.ConfigParser()
 config.read('dwh.cfg')
 
+LOG_DATA = config.get('S3', 'LOG_DATA')
+LOG_JSONPATH = config.get('S3', 'LOG_JSONPATH')
+SONG_DATA = config.get('S3', 'SONG_DATA')
+IAM_ROLE = config.get('IAM_ROLE', 'ARN')
+
 # DROP TABLES
 
 staging_events_table_drop = "DROP TABLE IF EXISTS S_events;"
-staging_songs_table_drop = "DROP TABLE IF EXISTS S_songs"
+staging_songs_table_drop = "DROP TABLE IF EXISTS S_songs;"
 songplay_table_drop = "DROP TABLE IF EXISTS F_songplay;"
 user_table_drop = "DROP TABLE IF EXISTS D_user;"
 song_table_drop = "DROP TABLE IF EXISTS D_song;"
@@ -30,8 +35,7 @@ time_table_drop = "DROP TABLE IF EXISTS D_time;"
 # CREATE STAGING TABLES
 #######################################################################
 
-staging_events_table_create= ("""
-CREATE TABLE IF NOT EXISTS S_events (
+staging_events_table_create= ("""CREATE TABLE IF NOT EXISTS S_events (
     artist VARCHAR, 
     auth VARCHAR,
     firstName VARCHAR, 
@@ -49,14 +53,12 @@ CREATE TABLE IF NOT EXISTS S_events (
     status INT, 
     ts BIGINT,
     userAgent VARCHAR, 
-    userId INT
-);
-
+    userId INT);
 """)
 
 
 
-staging_songs_table_create = ("""CREATE TABLE IF NOT EXISTS staging_songs (
+staging_songs_table_create = ("""CREATE TABLE IF NOT EXISTS S_songs (
     artist_id VARCHAR,
     artist_latitude FLOAT,
     artist_location TEXT,
@@ -74,7 +76,7 @@ staging_songs_table_create = ("""CREATE TABLE IF NOT EXISTS staging_songs (
 #######################################################################
 
 songplay_table_create = ("""CREATE TABLE IF NOT EXISTS F_songplay (
-    songplay_id INTEGER IDENTIRY(0,1) PRIMARY KEY sortkey,
+    songplay_id INTEGER IDENTITY(0,1) PRIMARY KEY sortkey,
     user_id int, 
     level varchar,
     song_id varchar, 
@@ -109,7 +111,7 @@ artist_table_create = ("""CREATE TABLE IF NOT EXISTS D_artist (
     """)
 
 time_table_create = ("""CREATE TABLE IF NOT EXISTS D_time (
-    time_key serial PRIMARY KEY, 
+    time_key int PRIMARY KEY, 
     start_time time,
     hour int,
     day int, 
@@ -123,17 +125,17 @@ time_table_create = ("""CREATE TABLE IF NOT EXISTS D_time (
 # COPY EVENTS LOG DATA INTO STAGING_EVENTS TABLE FROM AWS S3 BUCKET
 #######################################################################
 
-staging_events_copy = ("""COPY staging_events 
+staging_events_copy = ("""COPY S_events 
                        FROM {} 
                        iam_role {}
                        json {}
-                       """).format(config.get('S3','LOG_DATA'),config.get('IAM_ROLE','ARN'),config.get('S3','LOG_JSONPATH'))
+                       """).format(LOG_DATA,IAM_ROLE,LOG_JSONPATH)
 
-staging_songs_copy = (""" COPY staging_songs 
+staging_songs_copy = (""" COPY S_songs 
                       FROM {}
                       iam_role {}
-                      json                    
-                      """).format(config.get('S3','SONG_DATA'),config.get('IAM_ROLE','ARN'))
+                      json 'auto'                  
+                      """).format(SONG_DATA,IAM_ROLE)
 
 
 
@@ -141,34 +143,49 @@ staging_songs_copy = (""" COPY staging_songs
 # INSERT INTO FACT AND DIMENSION TABLES
 #######################################################################
 
-songplay_table_insert = ("""INSERT INTO F_songplay (
-    start_time,
-    user_id, 
-    level, 
-    song_id,
-    artist_id,
-    session_id, 
-    location, 
-    useragent)
-    VALUES (%s,%s,%s,%s,%s,%s,%s,%s);
+songplay_table_insert = ("""INSERT INTO F_songplay (start_time,user_id,level,song_id,artist_id,session_id, location, useragent)
+SELECT timestamp 'epoch' + se.ts/1000 * interval '1 second' as start_time,
+       se.user_id, 
+       se.level,
+       ss.song_id,
+       ss.artist_id,
+       se.session_id,
+       se.location, 
+       se.user_agent
+    FROM S_events se 
+    JOIN S_songs ss ON se.artist = ss.artist_name AND se.song=ss.title
+    WHERE se.page='NextSong';
     """)
                                                                                                                                   
-user_table_insert = ("""INSERT INTO D_user (
-    user_id, 
-    first_name, 
-    last_name, 
-    gender, 
-    level) VALUES (%s,%s,%s,%s,%s) ON CONFLICT (user_id) DO UPDATE SET level=EXCLUDED.level;
+user_table_insert = ("""INSERT INTO D_user (user_id, first_name, last_name, gender, level)
+    SELECT DISTINCT user_id, first_name,last_name,gender,level
+    FROM S_events 
+    WHERE page='NextSong';
     """)
 
-song_table_insert = ("""INSERT INTO D_song (song_id, title, artist_id, year, duration) VALUES (%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING;
+song_table_insert = ("""INSERT INTO D_song (song_id, title, artist_id, year, duration)
+    SELECT song_id, title, artist_id, year, duration
+    FROM S_songs
+    WHERE song_id IS NOT NULL; 
 """)
 
-artist_table_insert = ("""INSERT INTO D_artist (artist_id, name, location, latitude, longitude) VALUES (%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING;
+artist_table_insert = ("""INSERT INTO D_artist (artist_id,name, location, latitude, longitude)
+    SELECT DISTINCT artist_id, artist_name, artist_location, artist_latitude, artist_longitude
+    FROM S_songs
+    WHERE artist_id IS NOT NULL; 
 """)
 
 
-time_table_insert = "INSERT INTO D_time (start_time, hour, day, week, month, year, weekday) VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING;"
+time_table_insert = ("""INSERT INTO D_time (start_time,hour,day, week, month,year, weekday) 
+     SELECT start_time,
+            extract(hour FROM start_time),
+            extract(day FROM start_time),
+            extract(week FROM start_time),
+            extract(month FROM start_time),
+            extract(year FROM start_time),
+            extract(dayofweek FROM start_time)
+    FROM F_songplay; 
+    """)
 
 
 # QUERY LISTS
