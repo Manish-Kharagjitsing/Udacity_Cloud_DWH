@@ -36,24 +36,24 @@ time_table_drop = "DROP TABLE IF EXISTS D_time;"
 #######################################################################
 
 staging_events_table_create= ("""CREATE TABLE IF NOT EXISTS S_events (
-    artist VARCHAR, 
+    artist VARCHAR sortkey, 
     auth VARCHAR,
-    firstName VARCHAR, 
+    first_name VARCHAR, 
     gender CHAR(1),
-    itemInSession INT,
-    lastName VARCHAR, 
+    item_in_session INT,
+    last_name VARCHAR, 
     length FLOAT, 
     level VARCHAR, 
     location VARCHAR,
     method VARCHAR, 
     page VARCHAR, 
     registration BIGINT, 
-    sessionId VARCHAR, 
+    session_id VARCHAR, 
     song VARCHAR,
     status INT, 
     ts BIGINT,
-    userAgent VARCHAR, 
-    userId INT);
+    user_agent VARCHAR, 
+    user_id INT);
 """)
 
 
@@ -63,7 +63,7 @@ staging_songs_table_create = ("""CREATE TABLE IF NOT EXISTS S_songs (
     artist_latitude FLOAT,
     artist_location TEXT,
     artist_longitude FLOAT,
-    artist_name VARCHAR,
+    artist_name VARCHAR sortkey,
     duration FLOAT,
     num_songs INT,
     song_id VARCHAR,
@@ -77,13 +77,14 @@ staging_songs_table_create = ("""CREATE TABLE IF NOT EXISTS S_songs (
 
 songplay_table_create = ("""CREATE TABLE IF NOT EXISTS F_songplay (
     songplay_id INTEGER IDENTITY(0,1) PRIMARY KEY sortkey,
+    start_time timestamp, 
     user_id int, 
     level varchar,
     song_id varchar, 
     artist_id varchar, 
     session_id varchar,
     location varchar, 
-    useragent varchar) ; 
+    user_agent varchar) ; 
     """)
 
 user_table_create = ("""CREATE TABLE IF NOT EXISTS D_user (
@@ -111,7 +112,7 @@ artist_table_create = ("""CREATE TABLE IF NOT EXISTS D_artist (
     """)
 
 time_table_create = ("""CREATE TABLE IF NOT EXISTS D_time (
-    time_key int PRIMARY KEY, 
+    time_key INTEGER IDENTITY(0,1) PRIMARY KEY sortkey, 
     start_time time,
     hour int,
     day int, 
@@ -143,7 +144,7 @@ staging_songs_copy = (""" COPY S_songs
 # INSERT INTO FACT AND DIMENSION TABLES
 #######################################################################
 
-songplay_table_insert = ("""INSERT INTO F_songplay (start_time,user_id,level,song_id,artist_id,session_id, location, useragent)
+songplay_table_insert = ("""INSERT INTO F_songplay (start_time,user_id,level,song_id,artist_id,session_id, location, user_agent)
 SELECT timestamp 'epoch' + se.ts/1000 * interval '1 second' as start_time,
        se.user_id, 
        se.level,
@@ -184,7 +185,7 @@ time_table_insert = ("""INSERT INTO D_time (start_time,hour,day, week, month,yea
             extract(month FROM start_time),
             extract(year FROM start_time),
             extract(dayofweek FROM start_time)
-    FROM F_songplay; 
+     FROM F_songplay; 
     """)
 
 
