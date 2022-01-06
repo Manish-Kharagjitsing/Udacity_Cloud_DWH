@@ -35,7 +35,8 @@ The purpose of this project is to demonstrate the value of the cloud data wareho
 
 # Staging Tables <a name="Staging_Tables"></a>
 
-![Alt text](images\Staging_tables.PNG?raw=true "Title")
+![Alt text](images/Staging_tables.PNG?raw=true "Title")
+
 
 # Fact and Dimensional Tables <a name="Fact_Dim"></a>
 
