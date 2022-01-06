@@ -40,6 +40,9 @@ The purpose of this project is to demonstrate the value of the cloud data wareho
 
 # Fact and Dimensional Tables <a name="Fact_Dim"></a>
 
+
+![Alt text](images/StarScheme_tables.PNG?raw=true "Title")
+
 # Technologies <a name="Technologies"></a>
 
 # Install Requirements <a name="Requirements"></a>
