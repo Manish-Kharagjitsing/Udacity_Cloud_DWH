@@ -48,7 +48,7 @@ staging_events_table_create= ("""CREATE TABLE IF NOT EXISTS S_events (
     method VARCHAR, 
     page VARCHAR, 
     registration BIGINT, 
-    session_id VARCHAR, 
+    session_id INT, 
     song VARCHAR,
     status INT, 
     ts BIGINT,
@@ -82,7 +82,7 @@ songplay_table_create = ("""CREATE TABLE IF NOT EXISTS F_songplay (
     level varchar,
     song_id varchar, 
     artist_id varchar, 
-    session_id varchar,
+    session_id int,
     location varchar, 
     user_agent varchar) ; 
     """)
@@ -189,7 +189,9 @@ time_table_insert = ("""INSERT INTO D_time (start_time,hour,day, week, month,yea
     """)
 
 
-# QUERY LISTS
+#######################################################################
+#  QUERY LISTS
+#######################################################################
 
 create_table_queries = [staging_events_table_create, staging_songs_table_create, songplay_table_create, user_table_create, song_table_create, artist_table_create, time_table_create]
 
